@@ -46,13 +46,13 @@ while True:
                 cv2.putText(frame, f"{confidence*100:.2f}%", (x1, y1 - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
         else:
-            print("No clownfish detected")
+            print("No lionfish detected")
 
     except requests.exceptions.RequestException as e:
         print(f"Error communicating with API: {e}")
 
     # Display frame
-    cv2.imshow("Clownfish Detection", frame)
+    cv2.imshow("lionfish Detection", frame)
 
     # Press 'q' to exit
     if cv2.waitKey(1) & 0xFF == ord('q'):
