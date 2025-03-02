@@ -5,6 +5,7 @@ from collections import deque
 # load model
 model = YOLO("/home/hyemdanu/Lionfish/runs/detect/train/weights/best.pt")
 
+
 # open webcam
 cap = cv2.VideoCapture(0)
 
@@ -49,6 +50,7 @@ while True:
             print(f"✅ Confirmed Lionfish! Stable Confidence: {smoothed_conf:.2f}%")
     cv2.imshow("Lionfish Detection", frame)
 
+    # press q to quit the camera
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
