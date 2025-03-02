@@ -2,7 +2,7 @@ import cv2
 from ultralytics import YOLO
 from collections import deque
 
-# load model
+# load model // change the username
 model = YOLO("/home/hyemdanu/Lionfish/runs/detect/train/weights/best.pt")
 
 
