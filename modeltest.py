@@ -1,9 +1,11 @@
 import cv2
 from ultralytics import YOLO
 from collections import deque
+import serial
+import time
 
 # load model // change the username
-model = YOLO("/home/hyemdanu/Lionfish/runs/detect/train/weights/best.pt")
+model = YOLO("/home/minh/Lionfish/runs/detect/train/weights/best.pt")
 
 
 # open webcam
@@ -11,6 +13,10 @@ cap = cv2.VideoCapture(0)
 
 # store last 5 confidence for more accuracy
 confidence_history = deque(maxlen=5)
+
+# setting up serial communication with arduino (change 'COM3' to your specific usb port)
+arduino = serial.Serial('COM3', 9600, timeout=1)
+time.sleep(2)  # wait for connection
 
 while True:
     ret, frame = cap.read()
@@ -44,10 +50,11 @@ while True:
 
         smoothed_conf = sum(confidence_history) / len(confidence_history)
 
-        # confirms lionfish detection if their is high consistent confidence
+        # confirms lionfish detection if there is high consistent confidence
         if smoothed_conf >= 65:
             detected = True
             print(f"✅ Confirmed Lionfish! Stable Confidence: {smoothed_conf:.2f}%")
+            arduino.write(b'1') # send signal to arduino
     cv2.imshow("Lionfish Detection", frame)
 
     # press q to quit the camera
@@ -56,3 +63,4 @@ while True:
 
 cap.release()
 cv2.destroyAllWindows()
+arduino.close()
