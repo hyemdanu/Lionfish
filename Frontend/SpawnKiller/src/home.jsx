@@ -204,16 +204,13 @@ const Home = ({ navigation }) => {
                   solid
                 />
               </TouchableOpacity>
-              <Text style={styles.cameraLabel}>
-                {activeCamera === 'Camera'}
-              </Text>
             </View>
           </View>
         </View>
 
         {/* Recent Activity */}
         <View style={styles.activitySection}>
-          <Text style={styles.sectionTitle}>Recent Activity</Text>
+          <Text style={styles.sectionTitle}>Fishy Logs</Text>
           {detectionHistory.length > 0 ? (
             <ScrollView style={styles.activityList}>
               {detectionHistory.map((item) => (

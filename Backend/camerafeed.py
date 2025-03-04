@@ -79,7 +79,7 @@ def detection_thread():
                 # changed to 67 for little more consistency
                 if smoothed_conf >= 67:
                     detected = True
-                    print(f"✅ Confirmed Lionfish! Stable Confidence: {smoothed_conf:.2f}%")
+                    # print(f"✅ Confirmed Lionfish! Stable Confidence: {smoothed_conf:.2f}%")
 
                     # Update detection data if it's a new detection (5 sec delay)
                     if time.time() - last_detection_time > 5:
