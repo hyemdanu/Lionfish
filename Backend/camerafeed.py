@@ -35,7 +35,7 @@ def generate_frames():
                 frame_data = encoded_frame.tobytes()
                 yield (b'--frame\r\n'
                        b'Content-Type: image/jpeg\r\n\r\n' + frame_data + b'\r\n')
-        time.sleep(0.03)  # ~30 FPS
+        time.sleep(0.03)
 
 
 def detection_thread():
@@ -44,7 +44,7 @@ def detection_thread():
     # camera
     cap = cv2.VideoCapture(0)
 
-    # get average of 15
+    # get average of 15 for a better average
     confidence_history = deque(maxlen=15)
 
     last_detection_time = time.time()
@@ -76,6 +76,7 @@ def detection_thread():
                 smoothed_conf = sum(confidence_history) / len(confidence_history)
 
                 # Only draw boxes if smoothed confidence is high enough
+                # changed to 67 for little more consistency
                 if smoothed_conf >= 67:
                     detected = True
                     print(f"✅ Confirmed Lionfish! Stable Confidence: {smoothed_conf:.2f}%")
