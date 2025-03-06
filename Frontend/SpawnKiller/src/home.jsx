@@ -29,9 +29,12 @@ const COLORS = {
 };
 
 // replace with your server IP and port
+// ------------------------------------------------ When at home/somewhere else
 // ------------------------------------------------
+const SERVER_URL = 'http://192.168.0.101:5000';
 // ------------------------------------------------
-const SERVER_URL = 'http://192.168.50.42:5000';
+// ------------------------------------------------ When at school
+// const SERVER_URL = 'http://192.168.50.42:5000';
 // ------------------------------------------------
 // ------------------------------------------------
 
@@ -109,6 +112,7 @@ const Home = ({ navigation }) => {
                 confidence: data.confidence,
                 timestamp: data.timestamp,
                 color: randomColor,
+                image_id: data.image_id, // Save the image_id for accessing the detection image
               };
 
               // Keep up to 15 most recent detections
@@ -125,6 +129,11 @@ const Home = ({ navigation }) => {
       if (interval) clearInterval(interval);
     };
   }, [isStreaming, detectionHistory]);
+
+  // Handle detection item press - navigate to detail view
+  const handleDetectionPress = (detection) => {
+    navigation.navigate('detection', { detection });
+  };
 
   return (
     <View style={styles.rootContainer}>
@@ -214,7 +223,11 @@ const Home = ({ navigation }) => {
           {detectionHistory.length > 0 ? (
             <ScrollView style={styles.activityList}>
               {detectionHistory.map((item) => (
-                <TouchableOpacity key={item.id} style={styles.activityItem}>
+                <TouchableOpacity
+                  key={item.id}
+                  style={styles.activityItem}
+                  onPress={() => handleDetectionPress(item)}
+                >
                   <View style={[styles.activityIcon, {backgroundColor: item.color}]}>
                     <FontAwesome5 name="fish" size={20} color={COLORS.white} solid />
                   </View>

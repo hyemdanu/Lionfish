@@ -2,13 +2,19 @@ import cv2
 from ultralytics import YOLO
 from collections import deque
 import time
-from flask import Flask, Response, jsonify
+from flask import Flask, Response, jsonify, send_file
 import threading
 import signal
 import sys
 from datetime import datetime
+import os
+import uuid
 
 app = Flask(__name__)
+
+# detection images
+DETECTION_DIR = "detection_images"
+os.makedirs(DETECTION_DIR, exist_ok=True)
 
 # variables
 frame_buffer = None
@@ -16,14 +22,16 @@ detection_data = {
     "detected": False,
     "confidence": 0,
     "timestamp": "",
-    "location": "Main Camera"
+    "location": "Main Camera",
+    "image_id": ""
 }
+detection_history = []
 frame_lock = threading.Lock()
 detection_lock = threading.Lock()
 stop_event = threading.Event()
 
 # Load YOLO model
-model = YOLO("/home/hyemdanu/Lionfish/runs/detect/train/weights/best.pt")
+model = YOLO("/home/hyemdanu/Lionfish/runs/train/lionfish_yolov11s/weights/best.pt")
 
 
 def generate_frames():
@@ -39,7 +47,7 @@ def generate_frames():
 
 
 def detection_thread():
-    global frame_buffer, detection_data
+    global frame_buffer, detection_data, detection_history
 
     # camera
     cap = cv2.VideoCapture(0)
@@ -76,23 +84,57 @@ def detection_thread():
                 smoothed_conf = sum(confidence_history) / len(confidence_history)
 
                 # Only draw boxes if smoothed confidence is high enough
-                # changed to 67 for little more consistency
-                if smoothed_conf >= 67:
+                if smoothed_conf >= 60:
                     detected = True
-                    # print(f"✅ Confirmed Lionfish! Stable Confidence: {smoothed_conf:.2f}%")
 
-                    # Update detection data if it's a new detection (5 sec delay)
+                    # if its new detection
                     if time.time() - last_detection_time > 5:
+                        # Generate a unique ID for this detection image
+                        image_id = str(uuid.uuid4())
+                        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+                        # Save the current frame with detection boxes
+                        detection_frame = frame.copy()
+
+                        # Draw boxes on the saved frame
+                        for result in results:
+                            if result.boxes:
+                                for box in result.boxes:
+                                    conf = box.conf[0].item() * 100
+                                    if conf >= 50:
+                                        x1, y1, x2, y2 = map(int, box.xyxy[0])
+                                        cv2.rectangle(detection_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                                        cv2.putText(detection_frame, f"{conf:.2f}%", (x1, y1 - 10),
+                                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+                        # Save the frame with detection boxes
+                        image_path = os.path.join(DETECTION_DIR, f"{image_id}.jpg")
+                        cv2.imwrite(image_path, detection_frame)
+
+                        # Update detection data
                         with detection_lock:
                             detection_data = {
                                 "detected": True,
                                 "confidence": round(smoothed_conf, 2),
-                                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                "location": "Main Camera"
+                                "timestamp": timestamp,
+                                "location": "Main Camera",
+                                "image_id": image_id
                             }
+
+                            # Add to history
+                            detection_history.append(detection_data.copy())
+                            # Keep only the most recent 50 detections in history
+                            if len(detection_history) > 50:
+                                # Remove the oldest detection image file
+                                old_image_id = detection_history[0]["image_id"]
+                                old_image_path = os.path.join(DETECTION_DIR, f"{old_image_id}.jpg")
+                                if os.path.exists(old_image_path):
+                                    os.remove(old_image_path)
+                                detection_history.pop(0)
+
                         last_detection_time = time.time()
 
-                    # draw boxes
+                    # draw boxes on the live stream
                     for result in results:
                         if result.boxes:
                             for box in result.boxes:
@@ -137,6 +179,21 @@ def video_feed():
 def get_detection_data():
     with detection_lock:
         return jsonify(detection_data)
+
+
+@app.route('/detection_history')
+def get_detection_history():
+    with detection_lock:
+        return jsonify(detection_history)
+
+
+@app.route('/detection_image/<image_id>')
+def get_detection_image(image_id):
+    image_path = os.path.join(DETECTION_DIR, f"{image_id}.jpg")
+    if os.path.exists(image_path):
+        return send_file(image_path, mimetype='image/jpeg')
+    else:
+        return jsonify({"error": "Image not found"}), 404
 
 
 @app.route('/shutdown', methods=['POST'])

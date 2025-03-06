@@ -5,7 +5,7 @@ import serial
 import time
 
 # load model // change the username / path accordingly
-model = YOLO("/home/hyemdanu/Lionfish/runs/detect/train/weights/best.pt")
+model = YOLO("/home/hyemdanu/Lionfish/runs/train/lionfish_yolov11s/weights/best.pt")
 
 # open webcam
 cap = cv2.VideoCapture(0)
@@ -28,7 +28,7 @@ while True:
     detected = False  # flag if confidence for lionfish
     current_confidences = []  # array for current confidence
 
-    # First, collect all confidences without drawing boxes
+    # wait before box
     for result in results:
         if result.boxes:  # If any detections exist
             for box in result.boxes:
@@ -45,7 +45,7 @@ while True:
         # check for 65 smoothed confidence
         if smoothed_conf >= 65:
             detected = True
-            print(f"✅ Confirmed Lionfish! Stable Confidence: {smoothed_conf:.2f}%")
+            print(f"Stable Confidence: {smoothed_conf:.2f}%")
             # arduino.write(b'1') # send signal to arduino
 
             for result in results:
