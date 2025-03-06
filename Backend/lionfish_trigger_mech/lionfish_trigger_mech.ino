@@ -10,9 +10,11 @@ void loop() {
   // put your main code here, to run repeatedly:
   if (Serial.available()>0){
     char command = Serial.read();
-    if (command == '1'){ #if lionfish detected then turn on light for 3 seconds for now at least
+    if (command == '1'){ //if lionfish detected then turn on light for 3 seconds for now at least
       digitalWrite(ledPin, HIGH);
-      delay(3000);
+      
+      
+    } else if (command == '0'){
       digitalWrite(ledPin, LOW);
     }
   }
