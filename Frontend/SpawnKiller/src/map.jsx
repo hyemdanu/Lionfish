@@ -12,10 +12,10 @@ import {
 } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import MapView, { Marker, Callout, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, Callout, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
 
-// colors - same as Home component
+// colors
 const COLORS = {
   navyBlue: '#1A2A56',
   lightPurple: '#A5A6F6',
@@ -30,6 +30,26 @@ const COLORS = {
 
 // replace when needed
 const SERVER_URL = 'http://192.168.50.42:5000';
+
+const fishColorMap = {};
+
+const getConsistentColor = (id) => {
+  if (fishColorMap[id]) {
+    return fishColorMap[id];
+  }
+
+  const colorOptions = [
+    COLORS.accentOrange,
+    COLORS.accentGreen,
+    COLORS.accentBlue,
+    COLORS.lightPurple,
+    COLORS.navyBlue
+  ];
+
+  const newColor = colorOptions[Object.keys(fishColorMap).length % colorOptions.length];
+  fishColorMap[id] = newColor;
+  return newColor;
+};
 
 const Map = ({ navigation }) => {
   const [isLoading, setIsLoading] = useState(true);
@@ -62,7 +82,7 @@ const Map = ({ navigation }) => {
           longitude: location.coords.longitude,
         });
 
-        // Update region to user's location
+        // update region
         setRegion({
           latitude: location.coords.latitude,
           longitude: location.coords.longitude,
@@ -85,46 +105,21 @@ const Map = ({ navigation }) => {
         const data = await response.json();
 
         if (data && data.detections) {
-          // Format the detection data for map markers
           const formattedLocations = data.detections.map(detection => {
-            // Parse location string (assuming format like "25.7617,-80.1918")
             const [lat, lng] = detection.location.split(',').map(Number);
-
-            // Random color for the fish icon (same as Home)
-            const colorOptions = [
-              COLORS.accentOrange,
-              COLORS.accentGreen,
-              COLORS.accentBlue,
-              COLORS.lightPurple,
-              COLORS.navyBlue
-            ];
-            const randomColor = colorOptions[Math.floor(Math.random() * colorOptions.length)];
-
-            // Calculate time display (similar to Home component)
-            const date = new Date(detection.timestamp);
-            const now = new Date();
-            const diffMinutes = Math.floor((now - date) / 60000);
-
-            let timeDisplay;
-            if (diffMinutes < 1) {
-              timeDisplay = 'Just now';
-            } else if (diffMinutes < 60) {
-              timeDisplay = `${diffMinutes} min ago`;
-            } else {
-              const hours = Math.floor(diffMinutes / 60);
-              timeDisplay = `${hours} hour${hours > 1 ? 's' : ''} ago`;
-            }
 
             return {
               id: detection.id || Date.now() + Math.random(),
               title: 'Lionfish Detected',
+              location: `${lat},${lng}`,
               latitude: lat,
               longitude: lng,
-              time: timeDisplay,
+              time: detection.time,
               confidence: detection.confidence,
               timestamp: detection.timestamp,
-              color: randomColor,
+              color: getConsistentColor(detection.image_id),
               image_id: detection.image_id,
+              region: detection.region || 'Unknown Area',
             };
           });
 
@@ -136,9 +131,7 @@ const Map = ({ navigation }) => {
     };
 
     fetchDetectionData();
-    // Set up interval to refresh data
-    const interval = setInterval(fetchDetectionData, 30000); // Every 30 seconds
-
+    const interval = setInterval(fetchDetectionData, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -186,7 +179,7 @@ const Map = ({ navigation }) => {
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.pageTitle}>Detection Map</Text>
+          <Text style={styles.pageTitle}>Fishy Map</Text>
 
           <View style={styles.rightIcons}>
             <TouchableOpacity
@@ -210,12 +203,12 @@ const Map = ({ navigation }) => {
               <MapView
                 ref={mapRef}
                 style={styles.map}
-                provider={PROVIDER_GOOGLE}
+                provider={PROVIDER_DEFAULT}
                 initialRegion={region}
                 showsUserLocation={true}
                 showsMyLocationButton={false}
                 showsCompass={true}
-                customMapStyle={mapStyle} // Custom map style
+                customMapStyle={mapStyle}
               >
                 {detectionLocations.map((location) => (
                   <Marker
@@ -256,6 +249,9 @@ const Map = ({ navigation }) => {
                 <Text style={styles.locationTime}>
                   {selectedLocation.time} • {selectedLocation.confidence}% confidence
                 </Text>
+                <Text style={styles.locationDetails}>
+                  📍 {selectedLocation.region} ({selectedLocation.latitude}, {selectedLocation.longitude})
+                </Text>
               </View>
             </View>
             <TouchableOpacity
@@ -270,14 +266,15 @@ const Map = ({ navigation }) => {
 
         {/* Recent detections section */}
         <View style={styles.recentDetectionsSection}>
-          <Text style={styles.sectionTitle}>Recent Detections</Text>
+          <Text style={styles.sectionTitle}>Fishy Finding </Text>
           {detectionLocations.length > 0 ? (
             <ScrollView
               style={styles.recentList}
               horizontal={true}
               showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.recentListContent}
             >
-              {detectionLocations.slice(0, 10).map((item) => (
+              {detectionLocations.slice(0, 10).reverse().map((item) => (
                 <TouchableOpacity
                   key={item.id}
                   style={styles.recentItem}
@@ -294,9 +291,10 @@ const Map = ({ navigation }) => {
                   }}
                 >
                   <View style={[styles.recentIcon, {backgroundColor: item.color}]}>
-                    <FontAwesome5 name="fish" size={16} color={COLORS.white} solid />
+                    <FontAwesome5 name="fish" size={22} color={COLORS.white} solid />
                   </View>
                   <Text style={styles.recentTime}>{item.time}</Text>
+                  <Text style={styles.recentConfidence}>{item.confidence}% confidence</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -534,7 +532,7 @@ const styles = StyleSheet.create({
   },
   recentDetectionsSection: {
     marginHorizontal: 16,
-    marginBottom: 100, // Extra padding for bottom nav
+    marginBottom: 100,
   },
   sectionTitle: {
     fontSize: 18,
@@ -545,31 +543,46 @@ const styles = StyleSheet.create({
   recentList: {
     flexDirection: 'row',
   },
+  recentListContent: {
+    paddingRight: 16,
+    paddingBottom: 8,
+    paddingLeft: 4,
+  },
   recentItem: {
     backgroundColor: COLORS.white,
     borderRadius: 16,
-    padding: 10,
+    padding: 14,
     marginRight: 12,
-    width: 80,
+    width: 140,
     alignItems: 'center',
+    justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
+    minHeight: 190,
   },
   recentIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 10,
   },
   recentTime: {
-    fontSize: 10,
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+    color: COLORS.textDark,
+    marginBottom: 4,
+  },
+  recentConfidence: {
+    fontSize: 11,
     textAlign: 'center',
     color: COLORS.textLight,
+    paddingHorizontal: 2,
   },
   emptyRecentContainer: {
     padding: 20,

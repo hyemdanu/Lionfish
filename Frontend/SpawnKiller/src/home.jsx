@@ -38,6 +38,28 @@ const SERVER_URL = 'http://192.168.50.42:5000';
 // ------------------------------------------------
 // ------------------------------------------------
 
+// Color map to ensure consistent colors for each fish
+const fishColorMap = {};
+
+// Function to get a consistent color for a specific detection
+const getConsistentColor = (id) => {
+  if (fishColorMap[id]) {
+    return fishColorMap[id];
+  }
+
+  const colorOptions = [
+    COLORS.accentOrange,
+    COLORS.accentGreen,
+    COLORS.accentBlue,
+    COLORS.lightPurple,
+    COLORS.navyBlue
+  ];
+
+  const newColor = colorOptions[Object.keys(fishColorMap).length % colorOptions.length];
+  fishColorMap[id] = newColor;
+  return newColor;
+};
+
 const Home = ({ navigation }) => {
   const [activeCamera, setActiveCamera] = useState('front');
   const [isStreaming, setIsStreaming] = useState(true);
@@ -67,19 +89,67 @@ const Home = ({ navigation }) => {
   useEffect(() => {
     let interval;
     if (isStreaming) {
+      // First load all existing detections when component mounts
+      const loadAllDetections = async () => {
+        try {
+          const response = await fetch(`${SERVER_URL}/all_detections`);
+          const data = await response.json();
+
+          if (data && data.detections && data.detections.length > 0) {
+            // Format the existing detections for display
+            const formattedDetections = data.detections.map(detection => {
+              // Calculate time display
+              const date = new Date(detection.timestamp);
+              const now = new Date();
+              const diffMinutes = Math.floor((now - date) / 60000);
+
+              let timeDisplay;
+              if (diffMinutes < 1) {
+                timeDisplay = 'Just now';
+              } else if (diffMinutes < 60) {
+                timeDisplay = `${diffMinutes} min ago`;
+              } else {
+                const hours = Math.floor(diffMinutes / 60);
+                timeDisplay = `${hours} hour${hours > 1 ? 's' : ''} ago`;
+              }
+
+              return {
+                id: detection.id || Date.now() + Math.random(),
+                title: 'Lionfish Detected',
+                location: detection.location,
+                region: detection.region || 'Unknown Area',
+                time: timeDisplay,
+                confidence: detection.confidence,
+                timestamp: detection.timestamp,
+                image_id: detection.image_id,
+              };
+            });
+
+            // Keep most recent 15
+            setDetectionHistory(formattedDetections.slice(0, 15));
+          }
+        } catch (error) {
+          console.error('Error loading all detections:', error);
+        }
+      };
+
+      // Load existing detections when component mounts
+      loadAllDetections();
+
+      // Set up polling for new detections
       interval = setInterval(async () => {
         try {
           const response = await fetch(`${SERVER_URL}/detection_data`);
           const data = await response.json();
 
           if (data.detected) {
-            // check if new detection
+            // Check if new detection
             const alreadyExists = detectionHistory.some(
               item => item.timestamp === data.timestamp
             );
 
             if (!alreadyExists) {
-              // calculate time diff
+              // Calculate time diff
               const date = new Date(data.timestamp);
               const now = new Date();
               const diffMinutes = Math.floor((now - date) / 60000);
@@ -94,25 +164,26 @@ const Home = ({ navigation }) => {
                 timeDisplay = `${hours} hour${hours > 1 ? 's' : ''} ago`;
               }
 
-              // Random color for the fish icon
-              const colorOptions = [
-                COLORS.accentOrange,
-                COLORS.accentGreen,
-                COLORS.accentBlue,
-                COLORS.lightPurple,
-                COLORS.navyBlue
-              ];
-              const randomColor = colorOptions[Math.floor(Math.random() * colorOptions.length)];
+              // Get realistic location from server instead of using "Main Camera"
+              const locResponse = await fetch(`${SERVER_URL}/all_detections?single=true`);
+              const locData = await locResponse.json();
+              let location = "Unknown";
+              let region = "Unknown Area";
+
+              if (locData && locData.detections && locData.detections.length > 0) {
+                location = locData.detections[0].location;
+                region = locData.detections[0].region || "Unknown Area";
+              }
 
               const newDetection = {
                 id: Date.now(),
                 title: 'Lionfish Detected',
-                location: data.location,
+                location: location,
+                region: region,
                 time: timeDisplay,
                 confidence: data.confidence,
                 timestamp: data.timestamp,
-                color: randomColor,
-                image_id: data.image_id, // Save the image_id for accessing the detection image
+                image_id: data.image_id,
               };
 
               // Keep up to 15 most recent detections
@@ -221,21 +292,27 @@ const Home = ({ navigation }) => {
         <View style={styles.activitySection}>
           <Text style={styles.sectionTitle}>Fishy Logs</Text>
           {detectionHistory.length > 0 ? (
-            <ScrollView style={styles.activityList}>
-              {detectionHistory.map((item) => (
+            <ScrollView
+                style={styles.activityList}
+                contentContainerStyle={styles.activityListContent}
+                showsVerticalScrollIndicator={false}
+            >
+              {detectionHistory.reverse().map((item) => (
                 <TouchableOpacity
                   key={item.id}
                   style={styles.activityItem}
                   onPress={() => handleDetectionPress(item)}
                 >
-                  <View style={[styles.activityIcon, {backgroundColor: item.color}]}>
+                  <View style={[styles.activityIcon, {backgroundColor: getConsistentColor(item.image_id)}]}>
                     <FontAwesome5 name="fish" size={20} color={COLORS.white} solid />
                   </View>
                   <View style={styles.activityContent}>
                     <Text style={styles.activityTitle}>{item.title}</Text>
                     <Text style={styles.activityTime}>
-                      {item.location} • {item.time}
-                      {item.confidence && ` • ${item.confidence}% confidence`}
+                      {item.region} • {item.time}
+                    </Text>
+                    <Text style={styles.activityConfidence}>
+                      {item.confidence}% confidence
                     </Text>
                   </View>
                   <FontAwesome5 name="chevron-circle-right" size={22} color={COLORS.textLight} solid />
@@ -421,7 +498,9 @@ const styles = StyleSheet.create({
   },
   activityList: {
     flex: 1,
-    paddingBottom: 70,
+  },
+  activityListContent: {
+    paddingBottom: 90,
   },
   activityItem: {
     flexDirection: 'row',
@@ -456,6 +535,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.textLight,
     marginTop: 3,
+  },
+  activityConfidence: {
+    fontSize: 13,
+    color: COLORS.textLight,
+    marginTop: 2,
   },
   emptyActivityContainer: {
     flex: 1,

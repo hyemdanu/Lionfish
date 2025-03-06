@@ -39,6 +39,30 @@ const DetectionDetail = ({ route, navigation }) => {
     return date.toLocaleString();
   };
 
+  // format the coordinates nicely
+  const formatCoordinates = (location) => {
+    if (!location || !location.includes(',')) {
+      return 'Location not available';
+    }
+
+    const [lat, lng] = location.split(',').map(coord => parseFloat(coord));
+
+    // format latitude (N/S)
+    const latDirection = lat >= 0 ? 'N' : 'S';
+    const latFormatted = `${Math.abs(lat).toFixed(6)}° ${latDirection}`;
+
+    // format longitude (E/W)
+    const lngDirection = lng >= 0 ? 'E' : 'W';
+    const lngFormatted = `${Math.abs(lng).toFixed(6)}° ${lngDirection}`;
+
+    return `${latFormatted}, ${lngFormatted}`;
+  };
+
+  // get region name if available
+  const getRegionName = () => {
+    return detection.region ? detection.region : 'Unknown Area';
+  };
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -107,10 +131,22 @@ const DetectionDetail = ({ route, navigation }) => {
                 <FontAwesome5 name="map-marker-alt" size={16} color={COLORS.navyBlue} solid />
               </View>
               <View style={styles.detailContent}>
-                <Text style={styles.detailLabel}>Location</Text>
-                <Text style={styles.detailValue}>{detection.location}</Text>
+                <Text style={styles.detailLabel}>Coordinates</Text>
+                <Text style={styles.detailValue}>{formatCoordinates(detection.location)}</Text>
               </View>
             </View>
+
+            {detection.region && (
+              <View style={styles.detailItem}>
+                <View style={styles.detailIconContainer}>
+                  <FontAwesome5 name="water" size={16} color={COLORS.navyBlue} solid />
+                </View>
+                <View style={styles.detailContent}>
+                  <Text style={styles.detailLabel}>Region</Text>
+                  <Text style={styles.detailValue}>{getRegionName()}</Text>
+                </View>
+              </View>
+            )}
 
             <View style={styles.detailItem}>
               <View style={styles.detailIconContainer}>
