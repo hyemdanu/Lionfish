@@ -31,7 +31,7 @@ const COLORS = {
 // replace with your server IP and port
 // ------------------------------------------------ When at home/somewhere else
 // ------------------------------------------------
-const SERVER_URL = 'http://192.168.0.101:5000';
+const SERVER_URL = 'http://192.168.50.42:5000';
 // ------------------------------------------------
 // ------------------------------------------------ When at school
 // const SERVER_URL = 'http://192.168.50.42:5000';

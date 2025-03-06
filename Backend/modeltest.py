@@ -5,7 +5,7 @@ import serial
 import time
 
 # Load YOLO model
-model = YOLO("/home/minh/PycharmProjects/Lionfish/runs/train/lionfish_yolov11s/weights/best.pt")
+model = YOLO("/home/hyemdanu/Lionfish/runs/train/lionfish_yolov11s/weights/best.pt")
 
 # Open webcam
 cap = cv2.VideoCapture(0)

@@ -9,6 +9,8 @@ import sys
 from datetime import datetime
 import os
 import uuid
+import serial
+import random
 
 app = Flask(__name__)
 
@@ -32,6 +34,14 @@ stop_event = threading.Event()
 
 # Load YOLO model
 model = YOLO("/home/hyemdanu/Lionfish/runs/train/lionfish_yolov11s/weights/best.pt")
+
+# Setting up serial communication with Arduino (change '/dev/ttyUSB0' to your port)
+try:
+    arduino = serial.Serial('/dev/ttyUSB0', 9600, timeout=1)
+    time.sleep(2)  # Wait for connection
+except serial.SerialException:
+    print("Could not connect to Arduino.")
+    arduino = None
 
 
 def generate_frames():
@@ -76,7 +86,7 @@ def detection_thread():
                         conf = box.conf[0].item() * 100
                         current_confidences.append(conf)
 
-            # calculate smoothed conifidence
+            # calculate smoothed confidence
             if current_confidences:
                 avg_conf = sum(current_confidences) / len(current_confidences)
                 confidence_history.append(avg_conf)
@@ -84,8 +94,10 @@ def detection_thread():
                 smoothed_conf = sum(confidence_history) / len(confidence_history)
 
                 # Only draw boxes if smoothed confidence is high enough
-                if smoothed_conf >= 60:
+                if smoothed_conf >= 65:
                     detected = True
+                    if arduino:
+                        arduino.write(b'1')  # Send signal to turn on light
 
                     # if its new detection
                     if time.time() - last_detection_time > 5:
@@ -145,12 +157,18 @@ def detection_thread():
                                     cv2.putText(frame, f"{conf:.2f}%", (x1, y1 - 10),
                                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
+            # Always send '0' when detection is False
+            if not detected and arduino:
+                arduino.write(b'0')  # Send signal to turn off light
+
             # update frame
             with frame_lock:
                 frame_buffer = frame.copy()
     finally:
         cap.release()
-        print("Camera released")
+        if arduino:
+            arduino.close()
+        print("Camera and Arduino released")
 
 
 def shutdown_server():
@@ -194,6 +212,44 @@ def get_detection_image(image_id):
         return send_file(image_path, mimetype='image/jpeg')
     else:
         return jsonify({"error": "Image not found"}), 404
+
+
+@app.route('/all_detections')
+def get_all_detections():
+    """
+    Endpoint to return all detections for the map view.
+    Returns a list of all detections with location data.
+    """
+    with detection_lock:
+        formatted_detections = []
+        for detection in detection_history:
+            # Use the existing location if it's properly formatted as "lat,lng"
+            # Otherwise create a random point (for testing)
+            location = detection.get("location", "Main Camera")
+
+            if location == "Main Camera" or "," not in location:
+                # Create a random point near Miami (or your preferred default location)
+                base_lat, base_lng = 25.7617, -80.1918  # Miami coordinates
+
+                # Add small random offset (±0.01 degrees) for visual separation on map
+                lat = base_lat + (random.random() - 0.5) * 0.02
+                lng = base_lng + (random.random() - 0.5) * 0.02
+
+                # Format as string
+                location = f"{lat:.6f},{lng:.6f}"
+
+            # Create detection object with all required fields for the map
+            detection_obj = {
+                "id": detection.get("image_id", str(random.randint(1000, 9999))),
+                "location": location,
+                "timestamp": detection.get("timestamp", ""),
+                "confidence": detection.get("confidence", 0),
+                "image_id": detection.get("image_id", "")
+            }
+
+            formatted_detections.append(detection_obj)
+
+        return jsonify({"detections": formatted_detections})
 
 
 @app.route('/shutdown', methods=['POST'])
