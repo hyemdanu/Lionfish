@@ -200,7 +200,7 @@ def detection_thread():
                         # Save the current frame with detection boxes
                         detection_frame = frame.copy()
 
-                        # Draw boxes on the saved frame
+                        # draw boxes on the saved frame
                         for result in results:
                             if result.boxes:
                                 for box in result.boxes:
