@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "SpawnKiller",
+    "slug": "SpawnKiller",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.C0DE2AH.spawnkiller",
+      "config": {
+        "googleMapsApiKey": "AIzaSyB519v1lLo1hcYHaygcHePzMjWu6QilzMA"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.C0DE2AH.spawnkiller",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyAFk9wf1dF_CgRRS_ipQKK1GhA6bLeHKXY"
+        }
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
