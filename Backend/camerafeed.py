@@ -300,18 +300,20 @@ def get_all_detections():
                 # Get actual device location
                 location_data = get_device_location()
     
-            if location_data:
-                location = f"{location_data['latitude']},{location_data['longitude']}"
-            else:
-                location = "Unknown"
+                if location_data:
+                    location = f"{location_data['latitude']},{location_data['longitude']}"
+                else:
+                    location = "Unknown"
+                
+                print(f"Lionfish detected! Location: {location}")
 
-            detection_obj = {
-                "detected": True,
-                "confidence": round(smoothed_conf, 2),
-                "timestamp": timestamp,
-                "location": location,
-                "image_id": image_id
-            }
+                detection_obj = {
+                    "detected": True,
+                    "confidence": round(smoothed_conf, 2),
+                    "timestamp": timestamp,
+                    "location": location,
+                    "image_id": image_id
+                }
             '''
             # Generate realistic location
             location_data = generate_realistic_lionfish_location()
