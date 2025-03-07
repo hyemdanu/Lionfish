@@ -63,6 +63,11 @@ const DetectionDetail = ({ route, navigation }) => {
     return detection.region ? detection.region : 'Unknown Area';
   };
 
+  // determine whether location is from GPS
+  const isGpsLocation = () => {
+    return detection.location_source === 'GPS';
+  };
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -127,26 +132,34 @@ const DetectionDetail = ({ route, navigation }) => {
             </View>
 
             <View style={styles.detailItem}>
-              <View style={styles.detailIconContainer}>
-                <FontAwesome5 name="map-marker-alt" size={16} color={COLORS.navyBlue} solid />
+              <View style={[
+                styles.detailIconContainer,
+                isGpsLocation() && styles.gpsIconContainer
+              ]}>
+                <FontAwesome5
+                  name={isGpsLocation() ? "satellite-dish" : "map-marker-alt"}
+                  size={16}
+                  color={isGpsLocation() ? COLORS.white : COLORS.navyBlue}
+                  solid
+                />
               </View>
               <View style={styles.detailContent}>
-                <Text style={styles.detailLabel}>Coordinates</Text>
+                <Text style={styles.detailLabel}>
+                  Coordinates {isGpsLocation() && <Text style={styles.gpsTag}>(GPS)</Text>}
+                </Text>
                 <Text style={styles.detailValue}>{formatCoordinates(detection.location)}</Text>
               </View>
             </View>
 
-            {detection.region && (
-              <View style={styles.detailItem}>
-                <View style={styles.detailIconContainer}>
-                  <FontAwesome5 name="water" size={16} color={COLORS.navyBlue} solid />
-                </View>
-                <View style={styles.detailContent}>
-                  <Text style={styles.detailLabel}>Region</Text>
-                  <Text style={styles.detailValue}>{getRegionName()}</Text>
-                </View>
+            <View style={styles.detailItem}>
+              <View style={styles.detailIconContainer}>
+                <FontAwesome5 name="water" size={16} color={COLORS.navyBlue} solid />
               </View>
-            )}
+              <View style={styles.detailContent}>
+                <Text style={styles.detailLabel}>Region</Text>
+                <Text style={styles.detailValue}>{getRegionName()}</Text>
+              </View>
+            </View>
 
             <View style={styles.detailItem}>
               <View style={styles.detailIconContainer}>
@@ -175,6 +188,31 @@ const DetectionDetail = ({ route, navigation }) => {
                   ]}
                 />
               </View>
+            </View>
+
+            {/* Location Source */}
+            <View style={styles.locationSourceContainer}>
+              <View style={[
+                styles.locationSourceBadge,
+                {
+                  backgroundColor: isGpsLocation() ? COLORS.accentGreen : COLORS.lightPurple
+                }
+              ]}>
+                <FontAwesome5
+                  name={isGpsLocation() ? "satellite-dish" : "map"}
+                  size={14}
+                  color={COLORS.white}
+                  solid
+                />
+                <Text style={styles.locationSourceText}>
+                  {isGpsLocation() ? 'GPS Location' : 'Approximate Location'}
+                </Text>
+              </View>
+              <Text style={styles.locationAccuracyText}>
+                {isGpsLocation()
+                  ? 'This location was captured from onboard GPS.'
+                  : 'This location is an approximation based on known lionfish habitats.'}
+              </Text>
             </View>
 
             {/* info on lionfish */}
@@ -303,6 +341,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  gpsIconContainer: {
+    backgroundColor: COLORS.accentGreen,
+  },
   detailContent: {
     marginLeft: 16,
     flex: 1,
@@ -310,6 +351,10 @@ const styles = StyleSheet.create({
   detailLabel: {
     fontSize: 14,
     color: COLORS.textLight,
+  },
+  gpsTag: {
+    color: COLORS.accentGreen,
+    fontWeight: 'bold',
   },
   detailValue: {
     fontSize: 16,
@@ -330,6 +375,29 @@ const styles = StyleSheet.create({
   confidenceBarFill: {
     height: '100%',
     borderRadius: 4,
+  },
+  locationSourceContainer: {
+    marginBottom: 24,
+  },
+  locationSourceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 8,
+  },
+  locationSourceText: {
+    color: COLORS.white,
+    fontWeight: '600',
+    fontSize: 14,
+    marginLeft: 8,
+  },
+  locationAccuracyText: {
+    fontSize: 14,
+    color: COLORS.textLight,
+    fontStyle: 'italic',
   },
   infoCard: {
     backgroundColor: COLORS.lightGray,

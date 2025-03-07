@@ -60,6 +60,25 @@ const getConsistentColor = (id) => {
   return newColor;
 };
 
+// Format coordinates in a more readable way
+const formatCoordinates = (location) => {
+  if (!location || !location.includes(',')) {
+    return 'Unknown Location';
+  }
+
+  const [lat, lng] = location.split(',').map(coord => parseFloat(coord));
+
+  // Format latitude (N/S)
+  const latDirection = lat >= 0 ? 'N' : 'S';
+  const latFormatted = `${Math.abs(lat).toFixed(4)}° ${latDirection}`;
+
+  // Format longitude (E/W)
+  const lngDirection = lng >= 0 ? 'E' : 'W';
+  const lngFormatted = `${Math.abs(lng).toFixed(4)}° ${lngDirection}`;
+
+  return `${latFormatted}, ${lngFormatted}`;
+};
+
 const Home = ({ navigation }) => {
   const [activeCamera, setActiveCamera] = useState('front');
   const [isStreaming, setIsStreaming] = useState(true);
@@ -118,6 +137,8 @@ const Home = ({ navigation }) => {
                 title: 'Lionfish Detected',
                 location: detection.location,
                 region: detection.region || 'Unknown Area',
+                location_source: detection.location_source || 'Unknown',
+                coordinates: formatCoordinates(detection.location),
                 time: timeDisplay,
                 confidence: detection.confidence,
                 timestamp: detection.timestamp,
@@ -164,15 +185,17 @@ const Home = ({ navigation }) => {
                 timeDisplay = `${hours} hour${hours > 1 ? 's' : ''} ago`;
               }
 
-              // Get realistic location from server instead of using "Main Camera"
+              // Get location data including real GPS coordinates if available
               const locResponse = await fetch(`${SERVER_URL}/all_detections?single=true`);
               const locData = await locResponse.json();
-              let location = "Unknown";
+              let location = data.location || "Unknown";
               let region = "Unknown Area";
+              let locationSource = "Unknown";
 
               if (locData && locData.detections && locData.detections.length > 0) {
-                location = locData.detections[0].location;
-                region = locData.detections[0].region || "Unknown Area";
+                location = locData.detections[0].location || location;
+                region = locData.detections[0].region || region;
+                locationSource = locData.detections[0].location_source || "Unknown";
               }
 
               const newDetection = {
@@ -180,6 +203,8 @@ const Home = ({ navigation }) => {
                 title: 'Lionfish Detected',
                 location: location,
                 region: region,
+                location_source: locationSource,
+                coordinates: formatCoordinates(location),
                 time: timeDisplay,
                 confidence: data.confidence,
                 timestamp: data.timestamp,
@@ -297,7 +322,7 @@ const Home = ({ navigation }) => {
                 contentContainerStyle={styles.activityListContent}
                 showsVerticalScrollIndicator={false}
             >
-              {detectionHistory.reverse().map((item) => (
+              {detectionHistory.map((item) => (
                 <TouchableOpacity
                   key={item.id}
                   style={styles.activityItem}
@@ -310,6 +335,12 @@ const Home = ({ navigation }) => {
                     <Text style={styles.activityTitle}>{item.title}</Text>
                     <Text style={styles.activityTime}>
                       {item.region} • {item.time}
+                    </Text>
+                    <Text style={styles.activityLocation}>
+                      {item.coordinates}
+                      {item.location_source === 'GPS' && (
+                        <Text style={styles.gpsIndicator}> • GPS</Text>
+                      )}
                     </Text>
                     <Text style={styles.activityConfidence}>
                       {item.confidence}% confidence
@@ -535,6 +566,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.textLight,
     marginTop: 3,
+  },
+  activityLocation: {
+    fontSize: 13,
+    color: COLORS.textLight,
+    marginTop: 2,
+  },
+  gpsIndicator: {
+    color: COLORS.accentGreen,
+    fontWeight: '600',
   },
   activityConfidence: {
     fontSize: 13,

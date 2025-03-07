@@ -51,6 +51,25 @@ const getConsistentColor = (id) => {
   return newColor;
 };
 
+// Format coordinates in a more readable way
+const formatCoordinates = (location) => {
+  if (!location || !location.includes(',')) {
+    return 'Unknown Location';
+  }
+
+  const [lat, lng] = location.split(',').map(coord => parseFloat(coord));
+
+  // Format latitude (N/S)
+  const latDirection = lat >= 0 ? 'N' : 'S';
+  const latFormatted = `${Math.abs(lat).toFixed(4)}° ${latDirection}`;
+
+  // Format longitude (E/W)
+  const lngDirection = lng >= 0 ? 'E' : 'W';
+  const lngFormatted = `${Math.abs(lng).toFixed(4)}° ${lngDirection}`;
+
+  return `${latFormatted}, ${lngFormatted}`;
+};
+
 const Map = ({ navigation }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [detectionLocations, setDetectionLocations] = useState([]);
@@ -108,18 +127,35 @@ const Map = ({ navigation }) => {
           const formattedLocations = data.detections.map(detection => {
             const [lat, lng] = detection.location.split(',').map(Number);
 
+            // Calculate time display for consistency
+            const date = new Date(detection.timestamp);
+            const now = new Date();
+            const diffMinutes = Math.floor((now - date) / 60000);
+
+            let timeDisplay;
+            if (diffMinutes < 1) {
+              timeDisplay = 'Just now';
+            } else if (diffMinutes < 60) {
+              timeDisplay = `${diffMinutes} min ago`;
+            } else {
+              const hours = Math.floor(diffMinutes / 60);
+              timeDisplay = `${hours} hour${hours > 1 ? 's' : ''} ago`;
+            }
+
             return {
               id: detection.id || Date.now() + Math.random(),
               title: 'Lionfish Detected',
               location: `${lat},${lng}`,
               latitude: lat,
               longitude: lng,
-              time: detection.time,
+              time: timeDisplay,
               confidence: detection.confidence,
               timestamp: detection.timestamp,
               color: getConsistentColor(detection.image_id),
               image_id: detection.image_id,
               region: detection.region || 'Unknown Area',
+              location_source: detection.location_source || 'Unknown',
+              coordinates: formatCoordinates(`${lat},${lng}`),
             };
           });
 
@@ -219,7 +255,14 @@ const Map = ({ navigation }) => {
                     }}
                     onPress={() => handleMarkerPress(location)}
                   >
-                    <View style={[styles.markerContainer, { backgroundColor: location.color }]}>
+                    <View style={[
+                      styles.markerContainer,
+                      {
+                        backgroundColor: location.color,
+                        borderColor: location.location_source === 'GPS' ? COLORS.accentGreen : COLORS.white,
+                        borderWidth: location.location_source === 'GPS' ? 3 : 2,
+                      }
+                    ]}>
                       <FontAwesome5 name="fish" size={16} color={COLORS.white} solid />
                     </View>
                   </Marker>
@@ -243,6 +286,11 @@ const Map = ({ navigation }) => {
             <View style={styles.cardHeader}>
               <View style={[styles.locationIcon, { backgroundColor: selectedLocation.color }]}>
                 <FontAwesome5 name="fish" size={20} color={COLORS.white} solid />
+                {selectedLocation.location_source === 'GPS' && (
+                  <View style={styles.gpsIndicatorBadge}>
+                    <FontAwesome5 name="satellite-dish" size={10} color={COLORS.white} solid />
+                  </View>
+                )}
               </View>
               <View style={styles.locationInfo}>
                 <Text style={styles.locationTitle}>{selectedLocation.title}</Text>
@@ -250,7 +298,10 @@ const Map = ({ navigation }) => {
                   {selectedLocation.time} • {selectedLocation.confidence}% confidence
                 </Text>
                 <Text style={styles.locationDetails}>
-                  📍 {selectedLocation.region} ({selectedLocation.latitude}, {selectedLocation.longitude})
+                  📍 {selectedLocation.region || 'Unknown Area'}
+                </Text>
+                <Text style={styles.locationCoordinates}>
+                  {selectedLocation.coordinates}
                 </Text>
               </View>
             </View>
@@ -290,11 +341,24 @@ const Map = ({ navigation }) => {
                     }
                   }}
                 >
-                  <View style={[styles.recentIcon, {backgroundColor: item.color}]}>
+                  <View style={[
+                    styles.recentIcon,
+                    {
+                      backgroundColor: item.color,
+                      borderColor: item.location_source === 'GPS' ? COLORS.accentGreen : 'transparent',
+                      borderWidth: item.location_source === 'GPS' ? 2 : 0,
+                    }
+                  ]}>
                     <FontAwesome5 name="fish" size={22} color={COLORS.white} solid />
                   </View>
                   <Text style={styles.recentTime}>{item.time}</Text>
+                  <Text style={styles.recentLocation}>{item.coordinates}</Text>
                   <Text style={styles.recentConfidence}>{item.confidence}% confidence</Text>
+                  {item.location_source === 'GPS' && (
+                    <View style={styles.gpsBadge}>
+                      <Text style={styles.gpsBadgeText}>GPS</Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -461,6 +525,19 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: COLORS.white,
   },
+  gpsIndicatorBadge: {
+    position: 'absolute',
+    bottom: -5,
+    right: -5,
+    backgroundColor: COLORS.accentGreen,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: COLORS.white,
+  },
   myLocationButton: {
     position: 'absolute',
     bottom: 16,
@@ -501,6 +578,7 @@ const styles = StyleSheet.create({
     borderRadius: 21,
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
   },
   locationInfo: {
     flex: 1,
@@ -515,6 +593,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.textLight,
     marginTop: 3,
+  },
+  locationDetails: {
+    fontSize: 13,
+    color: COLORS.textLight,
+    marginTop: 3,
+  },
+  locationCoordinates: {
+    fontSize: 13,
+    color: COLORS.navyBlue,
+    fontWeight: '500',
+    marginTop: 2,
   },
   viewDetailsButton: {
     backgroundColor: COLORS.navyBlue,
@@ -562,6 +651,7 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
     minHeight: 190,
+    position: 'relative',
   },
   recentIcon: {
     width: 52,
@@ -578,11 +668,32 @@ const styles = StyleSheet.create({
     color: COLORS.textDark,
     marginBottom: 4,
   },
+  recentLocation: {
+    fontSize: 11,
+    textAlign: 'center',
+    color: COLORS.navyBlue,
+    marginBottom: 4,
+    fontWeight: '500',
+  },
   recentConfidence: {
     fontSize: 11,
     textAlign: 'center',
     color: COLORS.textLight,
     paddingHorizontal: 2,
+  },
+  gpsBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: COLORS.accentGreen,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  gpsBadgeText: {
+    color: COLORS.white,
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   emptyRecentContainer: {
     padding: 20,

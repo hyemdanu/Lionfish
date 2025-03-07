@@ -11,6 +11,8 @@ import os
 import uuid
 import serial
 import random
+import requests
+import json
 
 app = Flask(__name__)
 
@@ -44,12 +46,48 @@ except serial.SerialException:
     arduino = None
 
 
+def get_laptop_location():
+    """
+    Get the current location of the laptop using IP-based geolocation.
+    Returns a dictionary with latitude, longitude, and region information.
+    """
+    try:
+        # Use IP-based geolocation services to get approximate location
+        response = requests.get('https://ipinfo.io/json')
+        if response.status_code == 200:
+            data = response.json()
+
+            # Check if location data is available
+            if 'loc' in data and data['loc']:
+                # Parse coordinates from the 'loc' field (format: "latitude,longitude")
+                lat, lng = map(float, data['loc'].split(','))
+
+                # Get region information
+                region = data.get('city', 'Unknown')
+                if 'region' in data and data['region']:
+                    region += f", {data['region']}"
+                if 'country' in data and data['country']:
+                    region += f", {data['country']}"
+
+                return {
+                    "latitude": round(lat, 6),
+                    "longitude": round(lng, 6),
+                    "region": region,
+                    "source": "Laptop"
+                }
+    except Exception as e:
+        print(f"Error getting laptop location: {e}")
+
+    # Fallback to a default location if the API request fails
+    return None
+
+
 def generate_realistic_lionfish_location():
     """
-    generate realistic coordinates for lionfish sightings in their natural habitat.
-    lionfish are invasive in the Caribbean, Gulf of Mexico, and western Atlantic.
+    Generate realistic coordinates for lionfish sightings in their natural habitat.
+    Used as a fallback when real location data is not available.
     """
-    # define regions where lionfish are commonly found (all in ocean, not on land)
+    # Define regions where lionfish are commonly found (all in ocean, not on land)
     lionfish_regions = [
         # Florida Keys and Caribbean
         {"name": "Florida Keys", "lat_range": (24.28, 25.85), "lng_range": (-82.15, -80.10)},
@@ -70,17 +108,18 @@ def generate_realistic_lionfish_location():
         {"name": "Cozumel", "lat_range": (20.3, 20.5), "lng_range": (-87.0, -86.9)}
     ]
 
-    # randomly select a region
+    # Randomly select a region
     region = random.choice(lionfish_regions)
 
-    # generate random coordinates within the selected region
+    # Generate random coordinates within the selected region
     lat = random.uniform(region["lat_range"][0], region["lat_range"][1])
     lng = random.uniform(region["lng_range"][0], region["lng_range"][1])
 
     return {
         "latitude": round(lat, 6),
         "longitude": round(lng, 6),
-        "region": region["name"]
+        "region": region["name"],
+        "source": "Simulated"
     }
 
 
@@ -99,10 +138,10 @@ def generate_frames():
 def detection_thread():
     global frame_buffer, detection_data, detection_history
 
-    # camera
+    # Camera
     cap = cv2.VideoCapture(0)
 
-    # get average of 15 for a better average
+    # Get average of 15 for a better average
     confidence_history = deque(maxlen=15)
 
     last_detection_time = time.time()
@@ -113,42 +152,55 @@ def detection_thread():
             if not ret:
                 continue
 
-            # get results
+            # Get results
             results = model(frame, verbose=False)
 
             detected = False
             current_confidences = []
 
-            # get the confidence results
+            # Get the confidence results
             for result in results:
                 if result.boxes:
                     for box in result.boxes:
                         conf = box.conf[0].item() * 100
                         current_confidences.append(conf)
 
-            # calculate smoothed confidence
+            # Calculate smoothed confidence
             if current_confidences:
                 avg_conf = sum(current_confidences) / len(current_confidences)
                 confidence_history.append(avg_conf)
 
                 smoothed_conf = sum(confidence_history) / len(confidence_history)
 
-                # only draw boxes if smoothed confidence is high enough
+                # Only draw boxes if smoothed confidence is high enough
                 if smoothed_conf >= 65:
                     detected = True
                     if arduino:
-                        arduino.write(b'1')  # send signal to turn on light
+                        arduino.write(b'1')  # Send signal to turn on light
 
-                    # if its new detection
+                    # If it's new detection
                     if time.time() - last_detection_time > 5:
-                        # generate a unique ID for this detection image
+                        # Generate a unique ID for this detection image
                         image_id = str(uuid.uuid4())
                         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-                        # save the current frame with detection boxes
+                        # Get laptop location
+                        location_data = get_laptop_location()
+
+                        # If laptop location isn't available, use simulated location
+                        if not location_data:
+                            location_data = generate_realistic_lionfish_location()
+
+                        # Format location as string for display
+                        location_str = f"{location_data['latitude']},{location_data['longitude']}"
+
+                        # Log detection with location
+                        print(f"Lionfish detected! Location: {location_str} (Source: {location_data['source']})")
+
+                        # Save the current frame with detection boxes
                         detection_frame = frame.copy()
 
-                        # draw boxes on the saved frame
+                        # Draw boxes on the saved frame
                         for result in results:
                             if result.boxes:
                                 for box in result.boxes:
@@ -159,25 +211,27 @@ def detection_thread():
                                         cv2.putText(detection_frame, f"{conf:.2f}%", (x1, y1 - 10),
                                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-                        # save the frame with detection boxes
+                        # Save the frame with detection boxes
                         image_path = os.path.join(DETECTION_DIR, f"{image_id}.jpg")
                         cv2.imwrite(image_path, detection_frame)
 
-                        # update detection data
+                        # Update detection data
                         with detection_lock:
                             detection_data = {
                                 "detected": True,
                                 "confidence": round(smoothed_conf, 2),
                                 "timestamp": timestamp,
-                                "location": "Main Camera",
+                                "location": location_str,
+                                "location_source": location_data.get("source", "Unknown"),
+                                "region": location_data.get("region", "Unknown"),
                                 "image_id": image_id
                             }
 
-                            # add to history
+                            # Add to history
                             detection_history.append(detection_data.copy())
-                            # keep only the most recent 50 detections in history
+                            # Keep only the most recent 50 detections in history
                             if len(detection_history) > 50:
-                                # remove the oldest detection image file
+                                # Remove the oldest detection image file
                                 old_image_id = detection_history[0]["image_id"]
                                 old_image_path = os.path.join(DETECTION_DIR, f"{old_image_id}.jpg")
                                 if os.path.exists(old_image_path):
@@ -186,7 +240,7 @@ def detection_thread():
 
                         last_detection_time = time.time()
 
-                    # draw boxes on the live stream
+                    # Draw boxes on the live stream
                     for result in results:
                         if result.boxes:
                             for box in result.boxes:
@@ -197,11 +251,11 @@ def detection_thread():
                                     cv2.putText(frame, f"{conf:.2f}%", (x1, y1 - 10),
                                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-            # always send '0' when detection is False
+            # Always send '0' when detection is False
             if not detected and arduino:
-                arduino.write(b'0')  # send signal to turn off light
+                arduino.write(b'0')  # Send signal to turn off light
 
-            # update frame
+            # Update frame
             with frame_lock:
                 frame_buffer = frame.copy()
     finally:
@@ -257,9 +311,9 @@ def get_detection_image(image_id):
 @app.route('/all_detections')
 def get_all_detections():
     """
-    endpoint to return all detections for the map view.
-    returns a list of all detections with realistic location data.
-    also supports a single=true parameter to return just one detection for new logs.
+    Endpoint to return all detections for the map view.
+    Returns a list of all detections with location data.
+    Also supports a single=true parameter to return just one detection for new logs.
     """
     with detection_lock:
         formatted_detections = []
@@ -267,30 +321,18 @@ def get_all_detections():
 
         # Use actual detection history data
         for detection in detection_history:
-            # Generate a consistent location for each detection based on its image_id
-            # This ensures a detection keeps the same location between requests
+            # Get the detection ID
             image_id = detection.get("image_id", "")
-
-            # Use image_id to seed the random number generator for consistent results
-            if image_id:
-                # Create a deterministic seed from the image_id string
-                seed = sum(ord(c) for c in image_id)
-                random.seed(seed)
-
-            # Generate realistic location
-            location_data = generate_realistic_lionfish_location()
-
-            # Format as string
-            location = f"{location_data['latitude']},{location_data['longitude']}"
 
             # Create detection object with all required fields for the map
             detection_obj = {
-                "id": detection.get("image_id", str(random.randint(1000, 9999))),
-                "location": location,
+                "id": image_id if image_id else str(random.randint(1000, 9999)),
+                "location": detection.get("location", ""),
                 "timestamp": detection.get("timestamp", ""),
                 "confidence": detection.get("confidence", 0),
-                "image_id": detection.get("image_id", ""),
-                "region": location_data["region"]  # include region name
+                "image_id": image_id,
+                "region": detection.get("region", "Unknown"),
+                "location_source": detection.get("location_source", "Unknown")
             }
 
             formatted_detections.append(detection_obj)
@@ -299,10 +341,19 @@ def get_all_detections():
             if single_mode:
                 break
 
-        # Reset the random seed
-        random.seed()
-
         return jsonify({"detections": formatted_detections})
+
+
+@app.route('/test_location')
+def test_location():
+    """
+    Endpoint to test the current laptop location
+    """
+    location = get_laptop_location()
+    if location:
+        return jsonify(location)
+    else:
+        return jsonify({"error": "Could not determine location"}), 404
 
 
 @app.route('/shutdown', methods=['POST'])
