@@ -12,6 +12,7 @@ import uuid
 import serial
 import random
 import requests
+import ollama
 import json
 
 app = Flask(__name__)
@@ -35,7 +36,7 @@ detection_lock = threading.Lock()
 stop_event = threading.Event()
 
 # load YOLO model
-model = YOLO("/home/minh/PycharmProjects/Lionfish/runs/train/lionfish_yolov11s/weights/best.pt")
+model = YOLO("/home/hyemdanu/Lionfish/runs/train/lionfish_yolov11s/weights/best.pt")
 
 # setting up serial communication with Arduino (change '/dev/ttyUSB0' to your port)
 try:
@@ -81,48 +82,6 @@ def get_laptop_location():
     # Fallback to a default location if the API request fails
     return None
 
-
-def generate_realistic_lionfish_location():
-    """
-    Generate realistic coordinates for lionfish sightings in their natural habitat.
-    Used as a fallback when real location data is not available.
-    """
-    # Define regions where lionfish are commonly found (all in ocean, not on land)
-    lionfish_regions = [
-        # Florida Keys and Caribbean
-        {"name": "Florida Keys", "lat_range": (24.28, 25.85), "lng_range": (-82.15, -80.10)},
-        {"name": "Bahamas", "lat_range": (23.5, 27.0), "lng_range": (-79.5, -74.0)},
-        {"name": "Puerto Rico", "lat_range": (17.9, 18.5), "lng_range": (-67.3, -65.2)},
-        {"name": "Jamaica", "lat_range": (17.5, 18.5), "lng_range": (-78.5, -76.0)},
-
-        # Gulf of Mexico
-        {"name": "Gulf of Mexico", "lat_range": (24.0, 29.0), "lng_range": (-97.0, -83.0)},
-
-        # Western Atlantic
-        {"name": "Bermuda", "lat_range": (32.2, 32.4), "lng_range": (-64.9, -64.6)},
-        {"name": "U.S. East Coast", "lat_range": (25.0, 35.0), "lng_range": (-82.0, -75.0)},
-
-        # Other invasion areas
-        {"name": "Cayman Islands", "lat_range": (19.2, 19.4), "lng_range": (-81.4, -81.1)},
-        {"name": "Belize Barrier Reef", "lat_range": (16.1, 18.5), "lng_range": (-88.1, -87.5)},
-        {"name": "Cozumel", "lat_range": (20.3, 20.5), "lng_range": (-87.0, -86.9)}
-    ]
-
-    # Randomly select a region
-    region = random.choice(lionfish_regions)
-
-    # Generate random coordinates within the selected region
-    lat = random.uniform(region["lat_range"][0], region["lat_range"][1])
-    lng = random.uniform(region["lng_range"][0], region["lng_range"][1])
-
-    return {
-        "latitude": round(lat, 6),
-        "longitude": round(lng, 6),
-        "region": region["name"],
-        "source": "Simulated"
-    }
-
-
 def generate_frames():
     while not stop_event.is_set():
         global frame_buffer
@@ -145,7 +104,7 @@ def detection_thread():
     global frame_buffer, detection_data, detection_history
 
     # Camera
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(4)
 
     # Get average of 15 for a better average
     confidence_history = deque(maxlen=15)
@@ -179,7 +138,7 @@ def detection_thread():
                 smoothed_conf = sum(confidence_history) / len(confidence_history)
 
                 # Only draw boxes if smoothed confidence is high enough
-                if smoothed_conf >= 65:
+                if smoothed_conf >= 65 and any(box.conf[0].item() * 100 >= 50 for result in results for box in result.boxes):
                     detected = True
                     if arduino:
                         arduino.write(b'1')  # Send signal to turn on light
@@ -317,11 +276,6 @@ def get_detection_image(image_id):
 
 @app.route('/all_detections')
 def get_all_detections():
-    """
-    Endpoint to return all detections for the map view.
-    Returns a list of all detections with location data.
-    Also supports a single=true parameter to return just one detection for new logs.
-    """
     with detection_lock:
         formatted_detections = []
         single_mode = request.args.get('single') == 'true'
@@ -362,6 +316,37 @@ def test_location():
     else:
         return jsonify({"error": "Could not determine location"}), 404
 
+def random_lionfish_fact():
+    # Variety of prompts to prevent repetitive responses
+    prompt_variations = [
+        "In 1 to 2 sentence. Tell me an unusual or surprising fact about the invasive lionfish.",
+        "In 1 to 2 sentence. Give me a little-known fact about lionfish.",
+        "In 1 to 2 sentence. What is something unique about the invasive lionfish?",
+        "In 1 to 2 sentence. Share a scientific fact about lionfish that many people don't know that could hurt the environment",
+        "In 1 to 2 sentence. Tell me a fascinating historical or ecological fact about lionfish that could bad for the world."
+    ]
+
+    # Pick a different prompt each time
+    selected_prompt = random.choice(prompt_variations)
+
+    # Structure the conversation
+    messages = [
+        {"role": "system", "content": "You are a marine biologist and expert on invasive species."},
+        {"role": "user", "content": selected_prompt}
+    ]
+
+    # Generate a response with increased randomness & diverse word choices
+    response = ollama.chat(
+        model="llama3",
+        messages=messages,
+        options={"temperature": 0.85, "top_p": 0.9}
+    )
+
+    return jsonify({"fact": response['message']['content']})
+
+@app.route('/random_lionfish_fact')
+def get_lionfish_fact():
+    return random_lionfish_fact()
 
 @app.route('/shutdown', methods=['POST'])
 def shutdown():

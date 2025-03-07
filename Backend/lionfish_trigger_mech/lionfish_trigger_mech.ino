@@ -29,9 +29,11 @@ void loop() {
     }
     
     if (command == '2'){
-      servo.write(180);
       delay(3000);
+      servo.write(180);
+      delay(1000);
       servo.write(0);
+
       
     }
     

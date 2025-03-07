@@ -26,13 +26,46 @@ const COLORS = {
   accentBlue: '#5AC8FA',
 };
 
-// change when needed
-const SERVER_URL = 'http://192.168.0.130:5000';
+// replace with your server IP and port
+// ------------------------------------------------ When at home/somewhere else
+// ------------------------------------------------
+// const SERVER_URL = 'http://192.168.50.42:5000';
+// ------------------------------------------------
+// ------------------------------------------------ When at school
+const SERVER_URL = 'http://10.117.235.226:5000';
+// ------------------------------------------------
+// ------------------------------------------------
 
 const DetectionDetail = ({ route, navigation }) => {
   const { detection } = route.params;
   const [loading, setLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
+  const [lionfishFact, setLionfishFact] = useState('');
+  const [loadingFact, setLoadingFact] = useState(true);
+
+  useEffect(() => {
+    fetchRandomLionfishFact();
+  }, []);
+
+  const fetchRandomLionfishFact = async () => {
+    setLoadingFact(true);
+    try {
+      const response = await fetch(`${SERVER_URL}/random_lionfish_fact`);
+      if (response.ok) {
+        const data = await response.json();
+        setLionfishFact(data.fact);
+      } else {
+        // Fallback if fetch fails
+        setLionfishFact("Lionfish have distinctive red and white stripes and venomous spines.");
+      }
+    } catch (error) {
+      console.error('Error fetching lionfish fact:', error);
+      // Fallback if fetch fails
+      setLionfishFact("Lionfish have distinctive red and white stripes and venomous spines.");
+    } finally {
+      setLoadingFact(false);
+    }
+  };
 
   const formatTimestamp = (timestamp) => {
     const date = new Date(timestamp);
@@ -171,7 +204,7 @@ const DetectionDetail = ({ route, navigation }) => {
               </View>
             </View>
 
-            {/* Confidence Bar */}
+            {/* confidence bar */}
             <View style={styles.confidenceBarContainer}>
               <View style={styles.confidenceBarBg}>
                 <View
@@ -209,22 +242,39 @@ const DetectionDetail = ({ route, navigation }) => {
                 </Text>
               </View>
               <Text style={styles.locationAccuracyText}>
-                {isGpsLocation()
-                  ? 'This location was captured from onboard GPS.'
-                  : 'This location is an approximation based on known lionfish habitats.'}
+                Location captured by the GPS.
               </Text>
             </View>
 
-            {/* info on lionfish */}
+            {/* random lionfish facts */}
             <View style={styles.infoCard}>
               <View style={styles.infoHeader}>
-                <FontAwesome5 name="info-circle" size={18} color={COLORS.navyBlue} solid />
-                <Text style={styles.infoTitle}>Lionfish Information</Text>
+                <FontAwesome5 name="fish" size={18} color={COLORS.navyBlue} solid />
+                <Text style={styles.infoTitle}>Lionfish Fact</Text>
+                <TouchableOpacity
+                  style={styles.refreshButton}
+                  onPress={fetchRandomLionfishFact}
+                  disabled={loadingFact}
+                >
+                  <FontAwesome5
+                    name="sync"
+                    size={14}
+                    color={COLORS.white}
+                    solid
+                  />
+                </TouchableOpacity>
               </View>
-              <Text style={styles.infoText}>
-                The lionfish (Pterois species) is a venomous, predatory fish native to the Indo-Pacific but is now an invasive species in the Atlantic Ocean, particularly in the Caribbean and along the U.S. East Coast. Recognizable by its red, white, and brown striped body with long, venomous spines, the lionfish has no natural predators in these non-native waters.
-                Its invasion is a major ecological threat because it rapidly reproduces, consumes large quantities of native fish and crustaceans, and disrupts marine ecosystems by reducing biodiversity. Without natural controls, lionfish populations grow unchecked, outcompeting native species and damaging coral reef health. Efforts to control them include organized hunting, spearfishing, and culinary use to mitigate their impact.
-              </Text>
+
+              {loadingFact ? (
+                <View style={styles.factLoadingContainer}>
+                  <ActivityIndicator size="small" color={COLORS.navyBlue} />
+                  <Text style={styles.loadingFactText}>Loading fact...</Text>
+                </View>
+              ) : (
+                <Text style={styles.infoText}>
+                  {lionfishFact}
+                </Text>
+              )}
             </View>
           </View>
         </ScrollView>
@@ -415,11 +465,32 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.textDark,
     marginLeft: 8,
+    flex: 1,
   },
   infoText: {
     fontSize: 14,
     color: COLORS.textDark,
     lineHeight: 20,
+  },
+  refreshButton: {
+    backgroundColor: COLORS.navyBlue,
+    borderRadius: 14,
+    width: 28,
+    height: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  factLoadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+  },
+  loadingFactText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: COLORS.textLight,
+    fontStyle: 'italic',
   },
 });
 
