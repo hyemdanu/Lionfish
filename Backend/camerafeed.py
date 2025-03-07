@@ -33,7 +33,7 @@ detection_lock = threading.Lock()
 stop_event = threading.Event()
 
 # load YOLO model
-model = YOLO("/home/hyemdanu/Lionfish/runs/train/lionfish_yolov11s/weights/best.pt")
+model = YOLO("/home/daniel/Lionfish/runs/train/lionfish_yolov11s/weights/best.pt")
 
 # setting up serial communication with Arduino (change '/dev/ttyUSB0' to your port)
 try:
@@ -43,7 +43,7 @@ except serial.SerialException:
     print("Could not connect to Arduino.")
     arduino = None
 
-
+'''
 def generate_realistic_lionfish_location():
     """
     generate realistic coordinates for lionfish sightings in their natural habitat.
@@ -82,6 +82,23 @@ def generate_realistic_lionfish_location():
         "longitude": round(lng, 6),
         "region": region["name"]
     }
+'''
+#New code to log the location of lionfish
+def get_device_location():
+    try:
+        gps = serial.Serial('/dev/ttyUSB1', 9600, timeout=1)  # Change to your GPS module's port
+        line = gps.readline().decode('utf-8').strip()
+        
+        # Example parsing NMEA sentence (assuming GPGGA format)
+        if line.startswith('$GPGGA'):
+            data = line.split(',')
+            if len(data) > 5:
+                lat = float(data[2]) / 100  # Convert to decimal degrees
+                lon = float(data[4]) / 100
+                return {"latitude": round(lat, 6), "longitude": round(lon, 6)}
+    except Exception as e:
+        print(f"GPS Error: {e}")
+    return None  # Return None if GPS data isn't available
 
 
 def generate_frames():
@@ -276,7 +293,26 @@ def get_all_detections():
                 # Create a deterministic seed from the image_id string
                 seed = sum(ord(c) for c in image_id)
                 random.seed(seed)
+            
+            
+            #Code for logging the location when a lionfish is detected
+            if time.time() - last_detection_time > 5:
+                # Get actual device location
+                location_data = get_device_location()
+    
+            if location_data:
+                location = f"{location_data['latitude']},{location_data['longitude']}"
+            else:
+                location = "Unknown"
 
+            detection_obj = {
+                "detected": True,
+                "confidence": round(smoothed_conf, 2),
+                "timestamp": timestamp,
+                "location": location,
+                "image_id": image_id
+            }
+            '''
             # Generate realistic location
             location_data = generate_realistic_lionfish_location()
 
@@ -292,7 +328,7 @@ def get_all_detections():
                 "image_id": detection.get("image_id", ""),
                 "region": location_data["region"]  # include region name
             }
-
+            '''
             formatted_detections.append(detection_obj)
 
             # If we only need one detection for a new log entry
