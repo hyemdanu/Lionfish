@@ -29,7 +29,7 @@ const COLORS = {
 };
 
 // replace when needed
-const SERVER_URL = 'http://192.168.50.42:5000';
+const SERVER_URL = 'http://10.117.235.226:5000';
 
 const fishColorMap = {};
 
