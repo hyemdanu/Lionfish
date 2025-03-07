@@ -1,0 +1,22 @@
+{
+  "name": "lionfish",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hyemdanu/Lionfish.git"
+  },
+  "private": true,
+  "dependencies": {
+    "@expo/vector-icons": "^14.0.4",
+    "expo-linear-gradient": "^14.0.2",
+    "expo-location": "^18.0.7",
+    "react": "^19.0.0",
+    "react-native": "^0.78.0",
+    "react-native-maps": "^1.20.1"
+  }
+}

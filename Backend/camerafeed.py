@@ -35,7 +35,7 @@ detection_lock = threading.Lock()
 stop_event = threading.Event()
 
 # load YOLO model
-model = YOLO("/home/hyemdanu/Lionfish/runs/train/lionfish_yolov11s/weights/best.pt")
+model = YOLO("/home/minh/PycharmProjects/Lionfish/runs/train/lionfish_yolov11s/weights/best.pt")
 
 # setting up serial communication with Arduino (change '/dev/ttyUSB0' to your port)
 try:
@@ -135,6 +135,12 @@ def generate_frames():
         time.sleep(0.03)
 
 
+def firing_mech():
+    arduino.write(f"{2}".encode())
+
+
+
+
 def detection_thread():
     global frame_buffer, detection_data, detection_history
 
@@ -177,6 +183,7 @@ def detection_thread():
                     detected = True
                     if arduino:
                         arduino.write(b'1')  # Send signal to turn on light
+                        firing_mech()
 
                     # If it's new detection
                     if time.time() - last_detection_time > 5:
