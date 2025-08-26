@@ -16,7 +16,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.C0DE2AH.spawnkiller",
       "config": {
-        "googleMapsApiKey": "AIzaSyB519v1lLo1hcYHaygcHePzMjWu6QilzMA"
+        "googleMapsApiKey": "API KEY HERE"
       }
     },
     "android": {
@@ -27,7 +27,7 @@
       "package": "com.C0DE2AH.spawnkiller",
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyAFk9wf1dF_CgRRS_ipQKK1GhA6bLeHKXY"
+          "apiKey": "API KEY HERE"
         }
       }
     },
